@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/models/ship_config.dart';
 import '../../core/providers/providers.dart';
+import '../../shared/theme/app_theme.dart';
 import 'ship_detection_service.dart';
 
 final _detectionServiceProvider = Provider<ShipDetectionService>((ref) {
@@ -20,12 +21,7 @@ class _DetectionState {
   final _DetectionStatus status;
   final String? shipName;
   final String? error;
-
-  const _DetectionState({
-    required this.status,
-    this.shipName,
-    this.error,
-  });
+  const _DetectionState({required this.status, this.shipName, this.error});
 }
 
 class _DetectionNotifier extends StateNotifier<_DetectionState> {
@@ -43,10 +39,7 @@ class _DetectionNotifier extends StateNotifier<_DetectionState> {
       _ref.read(aidaClientProvider).updateShip(ship);
       state = _DetectionState(status: _DetectionStatus.success, shipName: ship);
     } catch (e) {
-      state = _DetectionState(
-        status: _DetectionStatus.error,
-        error: e.toString(),
-      );
+      state = _DetectionState(status: _DetectionStatus.error, error: e.toString());
     }
   }
 
@@ -58,21 +51,39 @@ class _DetectionNotifier extends StateNotifier<_DetectionState> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 class ShipDetectionScreen extends ConsumerStatefulWidget {
   const ShipDetectionScreen({super.key});
 
   @override
-  ConsumerState<ShipDetectionScreen> createState() =>
-      _ShipDetectionScreenState();
+  ConsumerState<ShipDetectionScreen> createState() => _ShipDetectionScreenState();
 }
 
-class _ShipDetectionScreenState extends ConsumerState<ShipDetectionScreen> {
+class _ShipDetectionScreenState extends ConsumerState<ShipDetectionScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulse;
+  late Animation<double> _scale;
+
   @override
   void initState() {
     super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _scale = Tween(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(_detectionStateProvider.notifier).detect();
     });
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
   }
 
   @override
@@ -82,81 +93,78 @@ class _ShipDetectionScreenState extends ConsumerState<ShipDetectionScreen> {
 
     ref.listen(_detectionStateProvider, (_, next) {
       if (next.status == _DetectionStatus.success) {
+        _pulse.stop();
         context.go('/login');
       }
     });
 
     return Scaffold(
+      backgroundColor: cs.surface,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo / Branding
-              Icon(Icons.directions_boat,
-                  size: 80, color: cs.primary),
-              const SizedBox(height: 24),
+              const Spacer(flex: 2),
+              // ── Hero logo ──────────────────────────────────────────────────
+              ScaleTransition(
+                scale: _scale,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppTheme.aidaRed, const Color(0xFF880000)],
+                    ),
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.aidaRed.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.directions_boat_rounded,
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
               Text(
                 'OpenAIDA',
-                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: cs.primary,
-                      fontWeight: FontWeight.bold,
+                      color: AppTheme.aidaRed,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
                     ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 'Dein AIDA Bordportal',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
               ),
-              const SizedBox(height: 48),
+              const Spacer(flex: 1),
 
-              // Status
-              if (state.status == _DetectionStatus.detecting) ...[
-                const CircularProgressIndicator.adaptive(),
-                const SizedBox(height: 16),
-                const Text('Schiff wird erkannt…', textAlign: TextAlign.center),
-              ],
+              // ── Status area ───────────────────────────────────────────────
+              _StatusArea(state: state),
 
-              if (state.status == _DetectionStatus.error) ...[
-                Icon(Icons.error_outline, size: 48, color: cs.error),
-                const SizedBox(height: 16),
-                Text(
-                  state.error ?? 'Unbekannter Fehler',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: cs.error),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      ref.read(_detectionStateProvider.notifier).detect(),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Erneut versuchen'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
+              const Spacer(flex: 2),
+
+              // ── Manual picker button ───────────────────────────────────────
+              if (state.status != _DetectionStatus.detecting)
+                TextButton.icon(
                   onPressed: () => _showManualPicker(context),
-                  icon: const Icon(Icons.list),
+                  icon: const Icon(Icons.list_rounded, size: 18),
                   label: const Text('Schiff manuell wählen'),
                 ),
-              ],
-
-              if (state.status == _DetectionStatus.idle) ...[
-                ElevatedButton(
-                  onPressed: () =>
-                      ref.read(_detectionStateProvider.notifier).detect(),
-                  child: const Text('Schiff erkennen'),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => _showManualPicker(context),
-                child: const Text('Anderes Schiff?'),
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -178,42 +186,154 @@ class _ShipDetectionScreenState extends ConsumerState<ShipDetectionScreen> {
   }
 }
 
+// ── Status area widget ────────────────────────────────────────────────────────
+
+class _StatusArea extends ConsumerWidget {
+  final _DetectionState state;
+  const _StatusArea({required this.state});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+
+    switch (state.status) {
+      case _DetectionStatus.detecting:
+        return Column(
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Schiff wird erkannt…',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        );
+
+      case _DetectionStatus.error:
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 40, color: cs.onErrorContainer),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.error ?? 'Kein AIDA-Netzwerk gefunden',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onErrorContainer,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () =>
+                  ref.read(_detectionStateProvider.notifier).detect(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Erneut versuchen'),
+            ),
+          ],
+        );
+
+      case _DetectionStatus.success:
+        return Column(
+          children: [
+            Icon(Icons.check_circle_rounded, size: 40, color: cs.primary),
+            const SizedBox(height: 8),
+            Text(
+              state.shipName != null
+                  ? 'AIDA${state.shipName![0].toUpperCase()}${state.shipName!.substring(1)} erkannt'
+                  : 'Schiff erkannt',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        );
+
+      case _DetectionStatus.idle:
+        return FilledButton.icon(
+          onPressed: () =>
+              ref.read(_detectionStateProvider.notifier).detect(),
+          icon: const Icon(Icons.search_rounded),
+          label: const Text('Schiff erkennen'),
+        );
+    }
+  }
+}
+
+// ── Ship picker bottom sheet ──────────────────────────────────────────────────
+
 class _ShipPickerSheet extends StatelessWidget {
   final void Function(String) onSelected;
   const _ShipPickerSheet({required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      maxChildSize: 0.9,
+      initialChildSize: 0.65,
+      maxChildSize: 0.92,
       minChildSize: 0.4,
       expand: false,
       builder: (_, controller) => Column(
         children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                Icon(Icons.directions_boat_rounded, color: cs.primary),
+                const SizedBox(width: 12),
+                Text(
+                  'Schiff wählen',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Schiff wählen',
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
           Expanded(
             child: ListView(
               controller: controller,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: ShipConfig.knownShips.map((ship) {
-                final name = 'AIDA${ship[0].toUpperCase()}${ship.substring(1)}';
-                return ListTile(
-                  leading: const Icon(Icons.directions_boat),
-                  title: Text(name),
-                  subtitle: Text('bordportal.$ship.aida.de'),
-                  onTap: () => onSelected(ship),
+                final display =
+                    'AIDA${ship[0].toUpperCase()}${ship.substring(1)}';
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 3),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primaryContainer,
+                      child: Icon(
+                        Icons.directions_boat_rounded,
+                        color: cs.onPrimaryContainer,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(display,
+                        style: const TextStyle(fontWeight: FontWeight.w500)),
+                    subtitle: Text('bordportal.$ship.aida.de',
+                        style: Theme.of(context).textTheme.bodySmall),
+                    trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                    onTap: () => onSelected(ship),
+                  ),
                 );
               }).toList(),
             ),

@@ -22,6 +22,11 @@ class AuthService {
     required String surname,
     required String pin,
   }) async {
+    // Clear any stale cached token so the auth request goes out clean.
+    // The interceptor also guards the auth-guest path, but clearing here
+    // ensures the in-memory cache is fresh after login completes.
+    _client.setToken(null);
+
     final response = await _api.authGuest(
       cabin: cabin,
       surname: surname,

@@ -104,6 +104,13 @@ class _AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    // Never inject p_auth on the auth endpoint – the server must create a
+    // fresh session ticket without any prior auth context.
+    if (options.path.contains('auth-guest')) {
+      handler.next(options);
+      return;
+    }
+
     // Prefer the fast in-memory token; fall back to persisted token on first
     // request after an app restart (before login re-populates _cachedToken).
     final token =

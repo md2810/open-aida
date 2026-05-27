@@ -8,33 +8,69 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    String friendly(Object e) {
+      final s = e.toString();
+      if (s.contains('401')) return 'Sitzung abgelaufen – bitte erneut anmelden.';
+      if (s.contains('403')) return 'Zugriff verweigert.';
+      if (s.contains('404')) return 'Inhalte nicht gefunden.';
+      if (s.contains('SocketException') || s.contains('Connection refused')) {
+        return 'Kein Netzwerk – bitte WLAN an Bord prüfen.';
+      }
+      if (s.contains('DioException') || s.contains('TimeoutException')) {
+        return 'Verbindung zum Server fehlgeschlagen.';
+      }
+      return s.length > 120 ? '${s.substring(0, 120)}…' : s;
+    }
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.wifi_off, size: 64, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 16),
+            // Error icon with container
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                size: 44,
+                color: cs.onErrorContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
             Text(
               'Verbindungsfehler',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: tt.titleLarge?.copyWith(
+                color: cs.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              error.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
+              friendly(error),
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
-              maxLines: 3,
+              maxLines: 4,
               overflow: TextOverflow.ellipsis,
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
+              const SizedBox(height: 28),
+              FilledButton.tonalIcon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Erneut versuchen'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(220, 48),
+                ),
               ),
             ],
           ],
@@ -49,6 +85,11 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
+    return Center(
+      child: CircularProgressIndicator(
+        color: Theme.of(context).colorScheme.primary,
+        strokeWidth: 3,
+      ),
+    );
   }
 }
