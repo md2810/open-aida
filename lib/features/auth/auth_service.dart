@@ -8,7 +8,6 @@ class AuthService {
   final AidaClient _client;
   final FlutterSecureStorage _storage;
 
-  static const String _tokenKey = 'aida_cookie_token';
   static const String _cabinKey = 'aida_cabin';
   static const String _surnameKey = 'aida_surname';
   static const String _pinKey = 'aida_pin';
@@ -17,15 +16,15 @@ class AuthService {
   AuthService(this._api, this._client, this._storage);
 
   /// Logs in and returns the guest on success.
+  /// Auth flow: auth-guest sets JSESSIONID in Set-Cookie (captured by interceptor),
+  /// and returns jwt + sessionToken in JSON. Both are stored for subsequent requests.
   Future<Guest> login({
     required String cabin,
     required String surname,
     required String pin,
   }) async {
-    // Clear any stale cached token so the auth request goes out clean.
-    // The interceptor also guards the auth-guest path, but clearing here
-    // ensures the in-memory cache is fresh after login completes.
-    _client.setToken(null);
+    // Clear any stale session so the auth request goes out clean.
+    _client.clearSession();
 
     final response = await _api.authGuest(
       cabin: cabin,
@@ -33,23 +32,32 @@ class AuthService {
       pin: pin,
     );
 
-    if (response.success != true || response.cookieToken == null) {
-      throw const AuthException(
-          'Login fehlgeschlagen. Bitte prüfe deine Daten.');
+    if (response.success != true || response.guest == null) {
+      throw AuthException(
+        response.errorMessages.isNotEmpty
+            ? response.errorMessages.first
+            : 'Login fehlgeschlagen. Bitte prüfe deine Daten.',
+      );
     }
 
-    final token = response.cookieToken!;
+    // At this point, _AuthInterceptor.onResponse has already captured
+    // JSESSIONID from the Set-Cookie header into _client.sessionId.
+    final jwt = response.jwt;
+    final sessionToken = response.sessionToken;
 
-    // ① Set token in-memory immediately so every subsequent Dio request in
-    //   this session gets p_auth injected WITHOUT waiting for SecureStorage.
-    _client.setToken(token);
+    // Store JWT + sessionToken in memory (JSESSIONID already captured by interceptor).
+    _client.setJwtAndToken(jwt: jwt, sessionToken: sessionToken);
 
-    // ② Persist token for session restoration across app restarts.
-    await _storage.write(key: _tokenKey, value: token);
+    // Persist for session restoration across app restarts.
+    await _client.saveSession(
+      sessionId: _client.sessionId,
+      jwt: jwt,
+      sessionToken: sessionToken,
+    );
     await _storage.write(key: _cabinKey, value: cabin);
     await _storage.write(key: _surnameKey, value: surname);
     await _storage.write(key: _pinKey, value: pin);
-    if (response.guest?.folio != null) {
+    if (response.guest!.folio != null) {
       await _storage.write(key: _folioKey, value: response.guest!.folio);
     }
 
@@ -73,28 +81,34 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    _client.setToken(null); // clear in-memory token immediately
+    _client.clearSession();
     await _storage.deleteAll();
   }
 
   /// Check if a session token exists (for app restart recovery).
   Future<Guest?> restoreSession() async {
-    final token = await _storage.read(key: _tokenKey);
+    final session = await _client.loadSession();
     final cabin = await _storage.read(key: _cabinKey);
     final folio = await _storage.read(key: _folioKey);
     final surname = await _storage.read(key: _surnameKey);
 
-    if (token == null || cabin == null || folio == null) return null;
+    if (session.sessionId == null || session.jwt == null || cabin == null || folio == null) {
+      return null;
+    }
 
-    // Warm in-memory token so the getUserData call has p_auth.
-    _client.setToken(token);
+    // Warm in-memory session so the getUserData call is authenticated.
+    _client.setSession(
+      sessionId: session.sessionId,
+      jwt: session.jwt,
+      sessionToken: session.sessionToken,
+    );
 
     try {
       final resp = await _api.getUserData(cabin: cabin, folio: folio);
       return resp.guest;
     } catch (_) {
-      // Session expired – try re-auth
-      _client.setToken(null);
+      // Session expired – try full re-auth with stored credentials.
+      _client.clearSession();
       if (surname != null) {
         try {
           return await login(

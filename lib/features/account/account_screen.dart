@@ -74,7 +74,7 @@ class AccountScreen extends ConsumerWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
-      ref.read(aidaClientProvider).setToken(null);
+      ref.read(aidaClientProvider).clearSession();
       ref.read(authStateProvider.notifier).state = null;
     }
   }

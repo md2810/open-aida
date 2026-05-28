@@ -4,14 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ship_config.dart';
 
 /// Central Dio client factory for the AIDA API.
-/// Handles:
-///   - Dynamic base URL from detected ship
-///   - Automatic p_auth query parameter injection
-///   - 401 → re-auth → retry
-///   - Simple 5-minute GET cache (except ship-data)
+/// Auth flow (confirmed via Proxyman logs of official app):
+///   1. Call auth-guest → server sets JSESSIONID in Set-Cookie + returns jwt in JSON
+///   2. Subsequent requests: Cookie: JSESSIONID=... + token: <JWT> header
+///   3. p_auth query param is NOT needed (sent empty by official app)
 class AidaClient {
-  static const String _tokenKey = 'aida_cookie_token';
-  static const String _folioKey = 'aida_folio';
+  static const String _sessionIdKey = 'aida_jsessionid';
+  static const String _jwtKey = 'aida_jwt';
+  static const String _sessionTokenKey = 'aida_session_token';
 
   final FlutterSecureStorage _storage;
   final SharedPreferences _prefs;
@@ -22,9 +22,10 @@ class AidaClient {
 
   String? _shipName;
 
-  /// In-memory token: set immediately after login so every subsequent request
-  /// gets the token synchronously without waiting for SecureStorage reads.
-  String? _cachedToken;
+  /// In-memory session state: set immediately after login.
+  String? _sessionId;  // JSESSIONID cookie value
+  String? _jwt;        // JWT for `token` header
+  String? _sessionToken; // short session token (sessionToken field) for p_auth on bordportal
 
   AidaClient(this._storage, this._prefs) {
     _shipName = _prefs.getString(ShipConfig.prefKey);
@@ -53,7 +54,7 @@ class AidaClient {
     dio.interceptors.addAll([
       _AuthInterceptor(_storage, this),
       _CacheInterceptor(),
-      LogInterceptor(requestBody: false, responseBody: false),
+      LogInterceptor(requestBody: true, responseBody: true),
     ]);
     return dio;
   }
@@ -65,37 +66,73 @@ class AidaClient {
     _chat.options.baseUrl = _baseChat;
   }
 
-  /// Call this immediately after a successful login to make the token
-  /// available synchronously for all subsequent requests.
-  void setToken(String? token) {
-    _cachedToken = token;
+  // Public read-only access to current session values.
+  String? get sessionId => _sessionId;
+  String? get jwt => _jwt;
+  String? get sessionToken => _sessionToken;
+
+  /// Called after a successful login with JWT + sessionToken.
+  /// JSESSIONID is captured automatically by the interceptor's onResponse.
+  void setJwtAndToken({required String? jwt, required String? sessionToken}) {
+    _jwt = jwt;
+    _sessionToken = sessionToken;
+  }
+
+  /// Restores a full session (app restart recovery).
+  void setSession({
+    required String? sessionId,
+    required String? jwt,
+    required String? sessionToken,
+  }) {
+    _sessionId = sessionId;
+    _jwt = jwt;
+    _sessionToken = sessionToken;
+  }
+
+  /// Clears all session state (logout or pre-login).
+  void clearSession() {
+    _sessionId = null;
+    _jwt = null;
+    _sessionToken = null;
   }
 
   Dio get bordPortal => _bordPortal;
   Dio get extApi => _extApi;
   Dio get chat => _chat;
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
-  Future<void> saveToken(String token) =>
-      _storage.write(key: _tokenKey, value: token);
-  Future<void> saveFolio(String folio) =>
-      _storage.write(key: _folioKey, value: folio);
-  Future<String?> getFolio() => _storage.read(key: _folioKey);
+  Future<void> saveSession({
+    required String? sessionId,
+    required String? jwt,
+    required String? sessionToken,
+  }) async {
+    if (sessionId != null) await _storage.write(key: _sessionIdKey, value: sessionId);
+    if (jwt != null) await _storage.write(key: _jwtKey, value: jwt);
+    if (sessionToken != null) await _storage.write(key: _sessionTokenKey, value: sessionToken);
+  }
+
+  Future<({String? sessionId, String? jwt, String? sessionToken})> loadSession() async {
+    return (
+      sessionId: await _storage.read(key: _sessionIdKey),
+      jwt: await _storage.read(key: _jwtKey),
+      sessionToken: await _storage.read(key: _sessionTokenKey),
+    );
+  }
+
   Future<void> clearAuth() async {
-    _cachedToken = null;
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _folioKey);
+    clearSession();
+    await _storage.deleteAll();
   }
 }
 
-/// Injects ?p_auth=TOKEN on every request.
-/// Uses the in-memory token from [AidaClient] first (set right after login),
-/// then falls back to SecureStorage (handles app-restart session restoration).
+/// Injects JSESSIONID (Cookie header) and JWT (token header) on every
+/// authenticated request, mirroring the official AIDA app's native auth pattern.
+/// Also captures JSESSIONID from auth-guest Set-Cookie responses.
 class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _storage;
   final AidaClient _client;
 
-  static const String _tokenKey = 'aida_cookie_token';
+  static const String _sessionIdKey = 'aida_jsessionid';
+  static const String _jwtKey = 'aida_jwt';
 
   _AuthInterceptor(this._storage, this._client);
 
@@ -104,23 +141,48 @@ class _AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Never inject p_auth on the auth endpoint – the server must create a
-    // fresh session ticket without any prior auth context.
+    // Never inject auth on the auth endpoint itself.
     if (options.path.contains('auth-guest')) {
       handler.next(options);
       return;
     }
 
-    // Prefer the fast in-memory token; fall back to persisted token on first
-    // request after an app restart (before login re-populates _cachedToken).
-    final token =
-        _client._cachedToken ?? await _storage.read(key: _tokenKey);
-    if (token != null) {
-      options.queryParameters['p_auth'] = token;
-      // Warm the in-memory cache so subsequent requests skip SecureStorage.
-      _client._cachedToken ??= token;
+    // Use in-memory values first; fall back to persisted values (app restart).
+    final sessionId = _client._sessionId ?? await _storage.read(key: _sessionIdKey);
+    final jwt = _client._jwt ?? await _storage.read(key: _jwtKey);
+
+    if (sessionId != null) {
+      options.headers['Cookie'] = 'JSESSIONID=$sessionId';
+      _client._sessionId ??= sessionId;
     }
+    if (jwt != null) {
+      options.headers['token'] = jwt;
+      _client._jwt ??= jwt;
+    }
+
     handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    // Capture JSESSIONID from the auth-guest response Set-Cookie header.
+    if (response.requestOptions.path.contains('auth-guest')) {
+      final setCookies = response.headers.map['set-cookie'] ?? [];
+      for (final cookie in setCookies) {
+        if (cookie.contains('JSESSIONID=')) {
+          // Cookie format: "JSESSIONID=VALUE; Path=/; ..."
+          final parts = cookie.split(';');
+          for (final part in parts) {
+            final trimmed = part.trim();
+            if (trimmed.startsWith('JSESSIONID=')) {
+              _client._sessionId = trimmed.substring('JSESSIONID='.length);
+              break;
+            }
+          }
+        }
+      }
+    }
+    handler.next(response);
   }
 
   @override
@@ -129,7 +191,6 @@ class _AuthInterceptor extends Interceptor {
     ErrorInterceptorHandler handler,
   ) async {
     if (err.response?.statusCode == 401) {
-      // Token expired – signal upstream to re-login
       handler.reject(err);
       return;
     }
