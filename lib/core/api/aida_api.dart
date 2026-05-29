@@ -159,8 +159,8 @@ class AidaApi {
 
   Future<SpaListResponse> getSpaItems({String locale = 'de_DE'}) async {
     final resp = await _client.extApi.get(
-      '/api/ext/CompeopleSpa.compeoplejsonwebservice/get-spa-items-list'
-      '/locale/$locale/types/WELLNESS_OASE/-duration-groups/account/-cabin',
+      '/api/ext/Aida.aidajsonwebservice/get-spaitems-list'
+      '/locale/$locale/-categories/-date',
     );
     return SpaListResponse.fromJson(resp.data as Map<String, dynamic>);
   }

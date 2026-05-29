@@ -21,37 +21,31 @@ class ProgramScreen extends ConsumerWidget {
         body: NestedScrollView(
           headerSliverBuilder: (context, _) => [
             SliverAppBar(
-              expandedHeight: 120,
+              expandedHeight: 100,
               pinned: true,
               stretch: true,
-              backgroundColor: AppTheme.aidaRed,
+              backgroundColor: const Color(0xFF7C1200),
               foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 56),
-                title: const Text(
-                  'Programm',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
+              title: const Text(
+                'Programm',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
                 ),
+              ),
+              flexibleSpace: FlexibleSpaceBar(
                 background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppTheme.aidaRed, Color(0xFF880000)],
-                    ),
-                  ),
+                  decoration: const BoxDecoration(gradient: AppTheme.gradSunrise),
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 24),
                       child: Opacity(
-                        opacity: 0.2,
-                        child: Icon(
-                          Icons.event_rounded,
+                        opacity: 0.15,
+                        child: const Icon(
+                          Icons.theater_comedy_rounded,
                           size: 90,
                           color: Colors.white,
                         ),
@@ -60,12 +54,13 @@ class ProgramScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              bottom: const TabBar(
+              bottom: TabBar(
                 labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
+                unselectedLabelColor: Colors.white60,
                 indicatorColor: Colors.white,
                 indicatorWeight: 3,
-                tabs: [
+                dividerColor: Colors.transparent,
+                tabs: const [
                   Tab(text: 'Veranstaltungen'),
                   Tab(text: 'Öffnungszeiten'),
                 ],
@@ -84,7 +79,91 @@ class ProgramScreen extends ConsumerWidget {
   }
 }
 
-// ─── Events Tab ──────────────────────────────────────────────────────────────
+// ─── Date strip ───────────────────────────────────────────────────────────────
+
+class _DateStrip extends StatelessWidget {
+  final DateTime selected;
+  final void Function(DateTime) onChanged;
+
+  const _DateStrip({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    // 3 days before + today + 6 days ahead = 10 total
+    final dates = List.generate(10, (i) => today.add(Duration(days: i - 3)));
+    final selectedDay = DateTime(selected.year, selected.month, selected.day);
+
+    return Container(
+      height: 78,
+      color: cs.surfaceContainerLow,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        itemCount: dates.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final date = dates[i];
+          final isSelected = date == selectedDay;
+          final isToday = date == today;
+
+          return GestureDetector(
+            onTap: () => onChanged(date),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 50,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.aidaRed
+                    : isToday
+                        ? cs.surfaceContainerHighest
+                        : cs.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: isToday && !isSelected
+                    ? Border.all(color: AppTheme.aidaRed, width: 1.5)
+                    : Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.4)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    DateFormat('EEE', 'de').format(date).toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? Colors.white70
+                          : cs.onSurfaceVariant,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? Colors.white : cs.onSurface,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Events tab ───────────────────────────────────────────────────────────────
 
 class _EventsTab extends ConsumerWidget {
   const _EventsTab();
@@ -96,7 +175,7 @@ class _EventsTab extends ConsumerWidget {
 
     return Column(
       children: [
-        _DatePickerRow(
+        _DateStrip(
           selected: selectedDate,
           onChanged: (d) => ref.read(selectedDateProvider.notifier).state = d,
         ),
@@ -116,81 +195,6 @@ class _EventsTab extends ConsumerWidget {
   }
 }
 
-class _DatePickerRow extends StatelessWidget {
-  final DateTime selected;
-  final void Function(DateTime) onChanged;
-
-  const _DatePickerRow({required this.selected, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final fmt = DateFormat('EEE, dd. MMM', 'de');
-    final today = DateTime.now();
-
-    return Container(
-      color: cs.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left_rounded),
-            onPressed: () => onChanged(selected.subtract(const Duration(days: 1))),
-            style: IconButton.styleFrom(foregroundColor: cs.primary),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: selected,
-                  firstDate: today.subtract(const Duration(days: 1)),
-                  lastDate: today.add(const Duration(days: 14)),
-                );
-                if (picked != null) onChanged(picked);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.calendar_today_rounded, size: 16, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isToday(selected, today)
-                          ? 'Heute, ${fmt.format(selected)}'
-                          : fmt.format(selected),
-                      style: tt.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right_rounded),
-            onPressed: () => onChanged(selected.add(const Duration(days: 1))),
-            style: IconButton.styleFrom(foregroundColor: cs.primary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _isToday(DateTime d, DateTime today) =>
-      d.year == today.year && d.month == today.month && d.day == today.day;
-}
-
 class _CategoryFilter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -200,7 +204,13 @@ class _CategoryFilter extends ConsumerWidget {
     final categories = eventsAsync.maybeWhen(
       data: (resp) {
         final all = <String>{};
-        for (final e in _allEvents(resp)) {
+        final events = [
+          ...resp.data?.morning ?? [],
+          ...resp.data?.afternoon ?? [],
+          ...resp.data?.evening ?? [],
+          ...resp.data?.night ?? [],
+        ];
+        for (final e in events) {
           for (final c in e.categories) {
             if (c.label != null) all.add(c.label!);
           }
@@ -212,9 +222,8 @@ class _CategoryFilter extends ConsumerWidget {
 
     if (categories.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      height: 48,
-      color: Theme.of(context).colorScheme.surface,
+    return SizedBox(
+      height: 46,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -240,21 +249,10 @@ class _CategoryFilter extends ConsumerWidget {
       ),
     );
   }
-
-  List<DailyEvent> _allEvents(DailyEventsResponse resp) {
-    if (resp.data == null) return [];
-    return [
-      ...resp.data!.morning,
-      ...resp.data!.afternoon,
-      ...resp.data!.evening,
-      ...resp.data!.night,
-    ];
-  }
 }
 
 class _EventList extends ConsumerWidget {
   final DailyEventsResponse data;
-
   const _EventList({required this.data});
 
   @override
@@ -270,92 +268,76 @@ class _EventList extends ConsumerWidget {
           .toList();
     }
 
-    final sections = <(String, IconData, List<DailyEvent>)>[
-      ('Morgen', Icons.wb_sunny_outlined, filter(data.data?.morning ?? [])),
-      ('Nachmittag', Icons.light_mode_outlined, filter(data.data?.afternoon ?? [])),
-      ('Abend', Icons.nights_stay_outlined, filter(data.data?.evening ?? [])),
-      ('Nacht', Icons.bedtime_outlined, filter(data.data?.night ?? [])),
-    ].where((s) => s.$3.isNotEmpty).toList();
+    final sections = <(String, IconData, Color, List<DailyEvent>)>[
+      ('Morgen', Icons.wb_sunny_outlined, const Color(0xFFFFB300),
+          filter(data.data?.morning ?? [])),
+      ('Nachmittag', Icons.light_mode_outlined, const Color(0xFFFF6D00),
+          filter(data.data?.afternoon ?? [])),
+      ('Abend', Icons.nights_stay_outlined, const Color(0xFF5C6BC0),
+          filter(data.data?.evening ?? [])),
+      ('Nacht', Icons.bedtime_outlined, const Color(0xFF1A237E),
+          filter(data.data?.night ?? [])),
+    ].where((s) => s.$4.isNotEmpty).toList();
 
     if (sections.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.event_busy_rounded,
-                  size: 56,
-                  color: Theme.of(context).colorScheme.outline),
-              const SizedBox(height: 12),
-              Text(
-                'Keine Veranstaltungen',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        ),
+      return _Empty(
+        icon: Icons.event_busy_rounded,
+        message: 'Keine Veranstaltungen',
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-      itemCount: sections.fold<int>(0, (sum, s) => sum + s.$3.length + 1),
-      itemBuilder: (_, idx) {
-        int offset = 0;
-        for (final (label, icon, events) in sections) {
-          if (idx == offset) {
-            return _SectionHeader(label: label, icon: icon);
-          }
-          offset++;
-          if (idx < offset + events.length) {
-            return _EventCard(
-              event: events[idx - offset],
-              baseUrl: baseUrl,
-            );
-          }
-          offset += events.length;
-        }
-        return null;
-      },
+      children: [
+        for (final (label, icon, color, events) in sections) ...[
+          _TimeHeader(label: label, icon: icon, color: color),
+          ...events.map((e) => _EventCard(event: e, baseUrl: baseUrl)),
+        ],
+      ],
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
+class _TimeHeader extends StatelessWidget {
   final String label;
   final IconData icon;
+  final Color color;
 
-  const _SectionHeader({required this.label, required this.icon});
+  const _TimeHeader({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: 18, bottom: 8),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: cs.primaryContainer,
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 16, color: cs.onPrimaryContainer),
+            child: Icon(icon, size: 15, color: color),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Text(
             label,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: cs.primary,
+                  color: color,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
                 ),
           ),
-          const SizedBox(width: 8),
-          Expanded(child: Divider(color: cs.outlineVariant.withValues(alpha: 0.5))),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Divider(
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ),
         ],
       ),
     );
@@ -377,11 +359,11 @@ class _EventCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => _showDetail(context),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -390,11 +372,21 @@ class _EventCard extends StatelessWidget {
             children: [
               // Time badge
               Container(
-                width: 50,
+                width: 52,
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  color: cs.primaryContainer,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppTheme.aidaRed.withValues(alpha: 0.15),
+                      AppTheme.aidaRed.withValues(alpha: 0.05),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppTheme.aidaRed.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -402,18 +394,22 @@ class _EventCard extends StatelessWidget {
                     Text(
                       event.startDateTimeLocalized?.time ?? '--:--',
                       style: tt.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.aidaRed,
                         fontSize: 13,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     if (event.endDateTimeLocalized?.time != null) ...[
-                      Icon(Icons.arrow_downward_rounded, size: 10, color: cs.onPrimaryContainer.withValues(alpha: 0.6)),
+                      Icon(
+                        Icons.arrow_downward_rounded,
+                        size: 9,
+                        color: AppTheme.aidaRed.withValues(alpha: 0.6),
+                      ),
                       Text(
                         event.endDateTimeLocalized!.time!,
                         style: tt.labelSmall?.copyWith(
-                          color: cs.onPrimaryContainer.withValues(alpha: 0.7),
+                          color: AppTheme.aidaRed.withValues(alpha: 0.7),
                           fontSize: 10,
                         ),
                         textAlign: TextAlign.center,
@@ -429,17 +425,18 @@ class _EventCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   child: CachedNetworkImage(
                     imageUrl: '$baseUrl${event.image}',
-                    width: 72,
-                    height: 72,
+                    width: 68,
+                    height: 68,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => SizedBox(
-                      width: 72,
-                      height: 72,
+                    errorWidget: (_, __, ___) => Container(
+                      width: 68,
+                      height: 68,
+                      color: cs.surfaceContainerHighest,
                       child: Icon(Icons.image_rounded, color: cs.outline),
                     ),
                   ),
                 ),
-              if (event.image != null) const SizedBox(width: 12),
+              if (event.image != null) const SizedBox(width: 10),
               // Content
               Expanded(
                 child: Column(
@@ -447,20 +444,22 @@ class _EventCard extends StatelessWidget {
                   children: [
                     Text(
                       event.title ?? event.eventName ?? '',
-                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (event.venueName != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(Icons.place_rounded, size: 12, color: cs.outline),
+                          Icon(Icons.place_rounded, size: 11, color: cs.outline),
                           const SizedBox(width: 2),
                           Expanded(
                             child: Text(
                               event.venueName!,
-                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -474,15 +473,17 @@ class _EventCard extends StatelessWidget {
                         spacing: 4,
                         runSpacing: 4,
                         children: event.categories.take(2).map((c) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: cs.secondaryContainer,
+                            color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             c.label ?? '',
                             style: tt.labelSmall?.copyWith(
-                              color: cs.onSecondaryContainer,
+                              color: cs.onPrimaryContainer,
+                              fontSize: 10,
                             ),
                           ),
                         )).toList(),
@@ -494,7 +495,11 @@ class _EventCard extends StatelessWidget {
               if (event.bookable == true)
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
-                  child: Icon(Icons.bookmark_add_rounded, size: 20, color: cs.primary),
+                  child: Icon(
+                    Icons.bookmark_add_rounded,
+                    size: 18,
+                    color: AppTheme.aidaBlue,
+                  ),
                 ),
             ],
           ),
@@ -529,8 +534,8 @@ class _EventDetail extends StatelessWidget {
       maxChildSize: 0.95,
       minChildSize: 0.4,
       expand: false,
-      builder: (_, controller) => ListView(
-        controller: controller,
+      builder: (_, ctrl) => ListView(
+        controller: ctrl,
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           if (event.image != null)
@@ -550,26 +555,22 @@ class _EventDetail extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           if (event.venueName != null)
-            Row(
-              children: [
-                Icon(Icons.place_rounded, size: 16, color: cs.primary),
-                const SizedBox(width: 6),
-                Text(event.venueName!, style: tt.bodyMedium),
-              ],
-            ),
+            Row(children: [
+              Icon(Icons.place_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(event.venueName!, style: tt.bodyMedium),
+            ]),
           if (event.startDateTimeLocalized != null) ...[
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.access_time_rounded, size: 16, color: cs.primary),
-                const SizedBox(width: 6),
-                Text(
-                  '${event.startDateTimeLocalized!.time ?? ''}'
-                  '${event.endDateTimeLocalized?.time != null ? ' – ${event.endDateTimeLocalized!.time}' : ''}',
-                  style: tt.bodyMedium,
-                ),
-              ],
-            ),
+            Row(children: [
+              Icon(Icons.access_time_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(
+                '${event.startDateTimeLocalized!.time ?? ''}'
+                '${event.endDateTimeLocalized?.time != null ? ' – ${event.endDateTimeLocalized!.time}' : ''}',
+                style: tt.bodyMedium,
+              ),
+            ]),
           ],
           if (event.description?.isNotEmpty == true) ...[
             const SizedBox(height: 16),
@@ -586,7 +587,7 @@ class _EventDetail extends StatelessWidget {
   }
 }
 
-// ─── Opening Hours Tab ────────────────────────────────────────────────────────
+// ─── Opening Hours tab ────────────────────────────────────────────────────────
 
 class _OpeningHoursTab extends ConsumerWidget {
   const _OpeningHoursTab();
@@ -600,10 +601,9 @@ class _OpeningHoursTab extends ConsumerWidget {
 
     return Column(
       children: [
-        _DatePickerRow(
+        _DateStrip(
           selected: selectedDate,
-          onChanged: (d) =>
-              ref.read(selectedDateProvider.notifier).state = d,
+          onChanged: (d) => ref.read(selectedDateProvider.notifier).state = d,
         ),
         Expanded(
           child: hoursAsync.when(
@@ -611,27 +611,13 @@ class _OpeningHoursTab extends ConsumerWidget {
             error: (e, _) => ErrorView(error: e),
             data: (resp) {
               if (resp.data.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.access_time_rounded,
-                            size: 56, color: cs.outline),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Keine Öffnungszeiten verfügbar',
-                          style: tt.titleMedium?.copyWith(
-                              color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
+                return _Empty(
+                  icon: Icons.access_time_rounded,
+                  message: 'Keine Öffnungszeiten verfügbar',
                 );
               }
               return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 100),
                 itemCount: resp.data.length,
                 itemBuilder: (_, i) {
                   final cat = resp.data[i];
@@ -639,30 +625,30 @@ class _OpeningHoursTab extends ConsumerWidget {
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                          color: cs.outlineVariant.withValues(alpha: 0.5)),
+                          color: cs.outlineVariant.withValues(alpha: 0.4)),
                     ),
                     child: Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                      ),
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         leading: Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(7),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(9),
                           ),
                           child: Icon(Icons.restaurant_rounded,
                               size: 16, color: cs.onPrimaryContainer),
                         ),
                         title: Text(
                           cat.categoryName ?? '',
-                          style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: tt.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         subtitle: cat.description != null
                             ? Text(cat.description!, style: tt.bodySmall)
@@ -670,16 +656,16 @@ class _OpeningHoursTab extends ConsumerWidget {
                         children: cat.venues.map((v) {
                           final periods = [
                             if (v.mealPeriods?.breakfast?.isNotEmpty == true)
-                              'Frühstück: ${_formatPeriods(v.mealPeriods!.breakfast!)}',
+                              'Frühstück: ${_fmtPeriods(v.mealPeriods!.breakfast!)}',
                             if (v.mealPeriods?.lunch?.isNotEmpty == true)
-                              'Mittagessen: ${_formatPeriods(v.mealPeriods!.lunch!)}',
+                              'Mittagessen: ${_fmtPeriods(v.mealPeriods!.lunch!)}',
                             if (v.mealPeriods?.dinner?.isNotEmpty == true)
-                              'Abendessen: ${_formatPeriods(v.mealPeriods!.dinner!)}',
+                              'Abendessen: ${_fmtPeriods(v.mealPeriods!.dinner!)}',
                           ];
                           return ListTile(
                             dense: true,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 2),
                             title: Text(v.venueName ?? '',
                                 style: tt.bodySmall?.copyWith(
                                     fontWeight: FontWeight.w600)),
@@ -703,10 +689,37 @@ class _OpeningHoursTab extends ConsumerWidget {
     );
   }
 
-  String _formatPeriods(List<MealPeriod> periods) {
-    return periods
-        .map((p) =>
-            '${p.startDateLocalized?.time ?? ''} – ${p.endDateLocalized?.time ?? ''}')
-        .join(', ');
+  String _fmtPeriods(List<MealPeriod> periods) => periods
+      .map((p) =>
+          '${p.startDateLocalized?.time ?? ''} – ${p.endDateLocalized?.time ?? ''}')
+      .join(', ');
+}
+
+// ─── Shared ───────────────────────────────────────────────────────────────────
+
+class _Empty extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _Empty({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 52, color: cs.outline),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
   }
 }

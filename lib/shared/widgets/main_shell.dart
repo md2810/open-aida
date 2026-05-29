@@ -3,13 +3,12 @@ import 'package:go_router/go_router.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
-
   const MainShell({super.key, required this.child});
 
   static const _tabs = [
     (path: '/home',     icon: Icons.home_outlined,          activeIcon: Icons.home_rounded,         label: 'Home'),
     (path: '/program',  icon: Icons.event_note_outlined,    activeIcon: Icons.event_note_rounded,   label: 'Programm'),
-    (path: '/vacation', icon: Icons.beach_access_outlined,  activeIcon: Icons.beach_access_rounded, label: 'Mein Urlaub'),
+    (path: '/vacation', icon: Icons.beach_access_outlined,  activeIcon: Icons.beach_access_rounded, label: 'Urlaub'),
     (path: '/discover', icon: Icons.explore_outlined,       activeIcon: Icons.explore_rounded,      label: 'Entdecken'),
     (path: '/account',  icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded,       label: 'Konto'),
   ];
@@ -27,7 +26,7 @@ class MainShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex(context),
         onDestinationSelected: (i) => context.go(_tabs[i].path),
-        animationDuration: const Duration(milliseconds: 300),
+        animationDuration: const Duration(milliseconds: 280),
         destinations: _tabs.map((t) => NavigationDestination(
           icon: Icon(t.icon),
           selectedIcon: Icon(t.activeIcon),

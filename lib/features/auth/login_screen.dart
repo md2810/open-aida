@@ -37,7 +37,8 @@ class _LoginNotifier extends StateNotifier<_LoginState> {
   }) async {
     state = const _LoginState(loading: true);
     try {
-      final guest = await _service.login(cabin: cabin, surname: surname, pin: pin);
+      final guest =
+          await _service.login(cabin: cabin, surname: surname, pin: pin);
       _ref.read(authStateProvider.notifier).state = guest;
       state = const _LoginState();
     } on AuthException catch (e) {
@@ -85,184 +86,236 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
-      backgroundColor: cs.surface,
-      body: CustomScrollView(
-        slivers: [
-          // ── Hero header ─────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppTheme.aidaRed, const Color(0xFF880000)],
-                ),
-              ),
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 48,
-                bottom: 40,
-                left: 24,
-                right: 24,
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.directions_boat_rounded,
-                      size: 44,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'OpenAIDA',
-                    style: tt.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Willkommen an Bord',
-                    style: tt.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ],
+      body: Stack(
+        children: [
+          // Full gradient background
+          Container(
+            decoration: const BoxDecoration(gradient: AppTheme.gradSea),
+          ),
+          // Wave decoration
+          Positioned(
+            right: -60,
+            top: -60,
+            child: Opacity(
+              opacity: 0.08,
+              child: const Icon(
+                Icons.waves_rounded,
+                size: 320,
+                color: Colors.white,
               ),
             ),
           ),
-
-          // ── Login form ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 4),
-
-                    // Cabin
-                    TextFormField(
-                      controller: _cabinCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Kabinennummer',
-                        prefixIcon: Icon(Icons.door_front_door_outlined),
-                        hintText: 'z. B. 7142',
-                      ),
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Bitte Kabinennummer eingeben'
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Surname
-                    TextFormField(
-                      controller: _surnameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nachname',
-                        prefixIcon: Icon(Icons.person_outline_rounded),
-                        hintText: 'Wie auf Ihrer Bordkarte',
-                      ),
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Bitte Nachname eingeben'
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // PIN
-                    TextFormField(
-                      controller: _pinCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'PIN (optional)',
-                        prefixIcon: const Icon(Icons.lock_outline_rounded),
-                        hintText: '4-stellige PIN',
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _pinVisible
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+          Positioned(
+            left: -40,
+            bottom: 80,
+            child: Opacity(
+              opacity: 0.05,
+              child: const Icon(
+                Icons.directions_boat_rounded,
+                size: 240,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // Content
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Brand header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 48, 24, 32),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
                           ),
-                          onPressed: () =>
-                              setState(() => _pinVisible = !_pinVisible),
+                          child: const Icon(
+                            Icons.directions_boat_rounded,
+                            size: 38,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      obscureText: !_pinVisible,
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
+                        const SizedBox(height: 16),
+                        Text(
+                          'OpenAIDA',
+                          style: tt.headlineMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Willkommen an Bord',
+                          style: tt.bodyLarge?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
+                  ),
 
-                    // Error banner
-                    if (state.error != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: cs.errorContainer,
-                          borderRadius: BorderRadius.circular(12),
+                  // Form card
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline_rounded,
-                                color: cs.onErrorContainer, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                state.error!,
-                                style: tt.bodyMedium?.copyWith(
-                                  color: cs.onErrorContainer,
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Anmelden',
+                            style: tt.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Bitte gib deine Borddaten ein',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Cabin
+                          TextFormField(
+                            controller: _cabinCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Kabinennummer',
+                              prefixIcon:
+                                  Icon(Icons.door_front_door_outlined),
+                              hintText: 'z. B. 7142',
+                            ),
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Bitte Kabinennummer eingeben'
+                                : null,
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Surname
+                          TextFormField(
+                            controller: _surnameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Nachname',
+                              prefixIcon:
+                                  Icon(Icons.person_outline_rounded),
+                              hintText: 'Wie auf Ihrer Bordkarte',
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Bitte Nachname eingeben'
+                                : null,
+                          ),
+                          const SizedBox(height: 14),
+
+                          // PIN
+                          TextFormField(
+                            controller: _pinCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'PIN (optional)',
+                              prefixIcon:
+                                  const Icon(Icons.lock_outline_rounded),
+                              hintText: '4-stellige PIN',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _pinVisible
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
                                 ),
+                                onPressed: () => setState(
+                                    () => _pinVisible = !_pinVisible),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                            obscureText: !_pinVisible,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _submit(),
+                          ),
+                          const SizedBox(height: 20),
 
-                    // Login button
-                    ElevatedButton(
-                      onPressed: state.loading ? null : _submit,
-                      child: state.loading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
+                          // Error
+                          if (state.error != null) ...[
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: cs.errorContainer,
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                            )
-                          : const Text('Anmelden'),
-                    ),
-                    const SizedBox(height: 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded,
+                                      color: cs.onErrorContainer, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      state.error!,
+                                      style: tt.bodyMedium?.copyWith(
+                                          color: cs.onErrorContainer),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
 
-                    // Change ship
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/setup'),
-                      icon: const Icon(Icons.directions_boat_outlined, size: 18),
-                      label: const Text('Anderes Schiff wählen'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: cs.onSurfaceVariant,
-                        side: BorderSide(color: cs.outlineVariant),
+                          // Login button
+                          ElevatedButton(
+                            onPressed: state.loading ? null : _submit,
+                            child: state.loading
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Anmelden'),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Change ship
+                          OutlinedButton.icon(
+                            onPressed: () => context.go('/setup'),
+                            icon: const Icon(
+                                Icons.directions_boat_outlined,
+                                size: 18),
+                            label: const Text('Anderes Schiff wählen'),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
           ),

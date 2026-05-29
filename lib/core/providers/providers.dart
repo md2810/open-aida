@@ -70,7 +70,10 @@ final boardTimeProvider =
 
 // ─── Daily Events ─────────────────────────────────────────────────────────────
 
-final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final selectedDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
 
 final dailyEventsProvider =
     FutureProvider.autoDispose<DailyEventsResponse>((ref) async {

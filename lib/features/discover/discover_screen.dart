@@ -21,36 +21,30 @@ class DiscoverScreen extends ConsumerWidget {
         body: NestedScrollView(
           headerSliverBuilder: (context, _) => [
             SliverAppBar(
-              expandedHeight: 120,
+              expandedHeight: 100,
               pinned: true,
               stretch: true,
-              backgroundColor: AppTheme.aidaRed,
+              backgroundColor: const Color(0xFF005A30),
               foregroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 56),
-                title: const Text(
-                  'Entdecken',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
+              title: const Text(
+                'Entdecken',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
                 ),
+              ),
+              flexibleSpace: FlexibleSpaceBar(
                 background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppTheme.aidaRed, Color(0xFF880000)],
-                    ),
-                  ),
+                  decoration: const BoxDecoration(gradient: AppTheme.gradAida),
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 24),
                       child: Opacity(
-                        opacity: 0.2,
-                        child: Icon(
+                        opacity: 0.15,
+                        child: const Icon(
                           Icons.explore_rounded,
                           size: 90,
                           color: Colors.white,
@@ -62,13 +56,14 @@ class DiscoverScreen extends ConsumerWidget {
               ),
               bottom: const TabBar(
                 labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
+                unselectedLabelColor: Colors.white60,
                 indicatorColor: Colors.white,
                 indicatorWeight: 3,
+                dividerColor: Colors.transparent,
                 tabs: [
-                  Tab(icon: Icon(Icons.restaurant_rounded, size: 18), text: 'Restaurants'),
-                  Tab(icon: Icon(Icons.place_rounded, size: 18), text: 'POIs'),
-                  Tab(icon: Icon(Icons.spa_rounded, size: 18), text: 'Spa'),
+                  Tab(icon: Icon(Icons.restaurant_rounded, size: 16), text: 'Restaurants'),
+                  Tab(icon: Icon(Icons.place_rounded, size: 16), text: 'Orte'),
+                  Tab(icon: Icon(Icons.spa_rounded, size: 16), text: 'Wellness'),
                 ],
               ),
             ),
@@ -94,50 +89,45 @@ class _RestaurantsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final shipName = ref.watch(shipNameProvider) ?? 'cosma';
-    final baseUrl = 'https://ext-api.$shipName.aida.de';
+    final baseUrl = 'https://bordportal.$shipName.aida.de';
 
     return ref.watch(restaurantsProvider).when(
-          loading: () => const LoadingView(),
-          error: (e, _) => ErrorView(
-            error: e,
-            onRetry: () => ref.invalidate(restaurantsProvider),
-          ),
-          data: (resp) {
-            final categories = <String, List<Restaurant>>{};
-            for (final r in resp.data) {
-              final cat = r.category ?? 'Sonstige';
-              categories.putIfAbsent(cat, () => []).add(r);
-            }
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(restaurantsProvider),
+      ),
+      data: (resp) {
+        if (resp.data.isEmpty) {
+          return const _Empty(
+            icon: Icons.restaurant_rounded,
+            message: 'Keine Restaurants gefunden',
+          );
+        }
 
-            final items = <Object>[];
-            for (final entry in categories.entries) {
-              items.add(entry.key); // section header
-              items.addAll(entry.value);
-            }
+        // Group by category
+        final categories = <String, List<Restaurant>>{};
+        for (final r in resp.data) {
+          final cat = r.category ?? 'Sonstige';
+          categories.putIfAbsent(cat, () => []).add(r);
+        }
 
-            if (items.isEmpty) {
-              return _EmptyState(
-                icon: Icons.restaurant_rounded,
-                message: 'Keine Restaurants gefunden',
-              );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-              itemCount: items.length,
-              itemBuilder: (_, i) {
-                final item = items[i];
-                if (item is String) {
-                  return _SectionLabel(label: item);
-                }
-                return _RestaurantCard(
-                  restaurant: item as Restaurant,
-                  baseUrl: baseUrl,
-                );
-              },
-            );
-          },
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
+          children: [
+            for (final entry in categories.entries) ...[
+              _SectionLabel(entry.key),
+              const SizedBox(height: 6),
+              ...entry.value.map((r) => _RestaurantCard(
+                    restaurant: r,
+                    baseUrl: baseUrl,
+                  )),
+              const SizedBox(height: 8),
+            ],
+          ],
         );
+      },
+    );
   }
 }
 
@@ -156,8 +146,8 @@ class _RestaurantCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -165,16 +155,20 @@ class _RestaurantCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Image header
             if (restaurant.image != null)
               CachedNetworkImage(
                 imageUrl: '$baseUrl${restaurant.image}',
-                height: 150,
+                height: 140,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorWidget: (_, __, ___) => Container(
-                  height: 80,
+                  height: 60,
                   color: cs.surfaceContainerHighest,
-                  child: Icon(Icons.restaurant_rounded, size: 40, color: cs.outline),
+                  child: Center(
+                    child: Icon(Icons.restaurant_rounded,
+                        size: 28, color: cs.outline),
+                  ),
                 ),
               ),
             Padding(
@@ -188,27 +182,30 @@ class _RestaurantCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           restaurant.name ?? '',
-                          style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          style: tt.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
                       if (restaurant.deck != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 3),
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             'Deck ${restaurant.deck}',
-                            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: tt.labelSmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ),
                       ],
                     ],
                   ),
                   if (restaurant.teaser != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       restaurant.teaser!.replaceAll(RegExp(r'<[^>]*>'), ''),
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -216,22 +213,23 @@ class _RestaurantCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  if (restaurant.bookable == true || restaurant.chargeable == true) ...[
+                  if (restaurant.bookable == true ||
+                      restaurant.chargeable == true) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         if (restaurant.bookable == true)
-                          _StatusBadge(
+                          _Badge(
                             label: 'Reservierbar',
                             icon: Icons.bookmark_add_rounded,
-                            color: Colors.green,
+                            color: AppTheme.aidaGreen,
                           ),
                         if (restaurant.chargeable == true) ...[
                           const SizedBox(width: 6),
-                          _StatusBadge(
+                          _Badge(
                             label: 'Kostenpflichtig',
                             icon: Icons.euro_rounded,
-                            color: Colors.orange,
+                            color: AppTheme.aidaYellow,
                           ),
                         ],
                       ],
@@ -251,10 +249,7 @@ class _RestaurantCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _RestaurantDetail(
-        restaurant: restaurant,
-        baseUrl: baseUrl,
-      ),
+      builder: (_) => _RestaurantDetail(restaurant: restaurant, baseUrl: baseUrl),
     );
   }
 }
@@ -277,7 +272,7 @@ class _RestaurantDetail extends StatelessWidget {
       expand: false,
       builder: (_, ctrl) => ListView(
         controller: ctrl,
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+        padding: EdgeInsets.zero,
         children: [
           if (restaurant.image != null)
             CachedNetworkImage(
@@ -296,24 +291,28 @@ class _RestaurantDetail extends StatelessWidget {
                     Expanded(
                       child: Text(
                         restaurant.name ?? '',
-                        style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                        style: tt.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                     if (restaurant.deck != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: cs.primaryContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text('Deck ${restaurant.deck}',
-                            style: tt.labelMedium?.copyWith(color: cs.onPrimaryContainer)),
+                            style: tt.labelMedium?.copyWith(
+                                color: cs.onPrimaryContainer)),
                       ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 if (restaurant.description != null)
                   Html(data: restaurant.description!),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -331,39 +330,41 @@ class _PoiTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final shipName = ref.watch(shipNameProvider) ?? 'cosma';
-    final baseUrl = 'https://ext-api.$shipName.aida.de';
+    final baseUrl = 'https://bordportal.$shipName.aida.de';
 
     return ref.watch(poiListProvider).when(
-          loading: () => const LoadingView(),
-          error: (e, _) => ErrorView(
-            error: e,
-            onRetry: () => ref.invalidate(poiListProvider),
-          ),
-          data: (resp) {
-            final categories = <String, List<Poi>>{};
-            for (final p in resp.data) {
-              final cat = p.category ?? 'Sonstige';
-              categories.putIfAbsent(cat, () => []).add(p);
-            }
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(poiListProvider),
+      ),
+      data: (resp) {
+        if (resp.data.isEmpty) {
+          return const _Empty(
+            icon: Icons.place_rounded,
+            message: 'Keine Orte gefunden',
+          );
+        }
 
-            if (resp.data.isEmpty) {
-              return _EmptyState(
-                icon: Icons.place_rounded,
-                message: 'Keine POIs gefunden',
-              );
-            }
+        final categories = <String, List<Poi>>{};
+        for (final p in resp.data) {
+          final cat = p.category ?? 'Sonstige';
+          categories.putIfAbsent(cat, () => []).add(p);
+        }
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-              children: [
-                for (final entry in categories.entries) ...[
-                  _SectionLabel(label: entry.key),
-                  ...entry.value.map((poi) => _PoiCard(poi: poi, baseUrl: baseUrl)),
-                ],
-              ],
-            );
-          },
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
+          children: [
+            for (final entry in categories.entries) ...[
+              _SectionLabel(entry.key),
+              const SizedBox(height: 6),
+              ...entry.value.map((p) => _PoiCard(poi: p, baseUrl: baseUrl)),
+              const SizedBox(height: 8),
+            ],
+          ],
         );
+      },
+    );
   }
 }
 
@@ -382,11 +383,11 @@ class _PoiCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => _showDetail(context),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -397,15 +398,15 @@ class _PoiCard extends StatelessWidget {
                 child: poi.imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: '$baseUrl${poi.imageUrl}',
-                        width: 64,
-                        height: 64,
+                        width: 60,
+                        height: 60,
                         fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => _PlaceholderIcon(
+                        errorWidget: (_, __, ___) => _Placeholder(
                           icon: Icons.place_rounded,
                           cs: cs,
                         ),
                       )
-                    : _PlaceholderIcon(icon: Icons.place_rounded, cs: cs),
+                    : _Placeholder(icon: Icons.place_rounded, cs: cs),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -414,19 +415,20 @@ class _PoiCard extends StatelessWidget {
                   children: [
                     Text(
                       poi.name ?? '',
-                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (poi.deck != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(Icons.layers_rounded, size: 13, color: cs.primary),
-                          const SizedBox(width: 4),
+                          Icon(Icons.layers_rounded, size: 12, color: cs.primary),
+                          const SizedBox(width: 3),
                           Text(
                             'Deck ${poi.deck}',
-                            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -434,7 +436,7 @@ class _PoiCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: cs.outline),
+              Icon(Icons.chevron_right_rounded, color: cs.outline, size: 20),
             ],
           ),
         ),
@@ -470,7 +472,7 @@ class _PoiDetail extends StatelessWidget {
       expand: false,
       builder: (_, ctrl) => ListView(
         controller: ctrl,
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+        padding: EdgeInsets.zero,
         children: [
           if (poi.imageUrl != null)
             CachedNetworkImage(
@@ -489,26 +491,32 @@ class _PoiDetail extends StatelessWidget {
                     Expanded(
                       child: Text(
                         poi.name ?? '',
-                        style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                        style: tt.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                     if (poi.deck != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: cs.primaryContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text('Deck ${poi.deck}',
-                            style: tt.labelMedium?.copyWith(color: cs.onPrimaryContainer)),
+                            style: tt.labelMedium?.copyWith(
+                                color: cs.onPrimaryContainer)),
                       ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 if (poi.teaser != null)
-                  Html(data: poi.teaser!, style: {'p': Style(fontWeight: FontWeight.bold)}),
-                if (poi.description != null)
-                  Html(data: poi.description!),
+                  Html(
+                    data: poi.teaser!,
+                    style: {'p': Style(fontWeight: FontWeight.bold)},
+                  ),
+                if (poi.description != null) Html(data: poi.description!),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -518,7 +526,7 @@ class _PoiDetail extends StatelessWidget {
   }
 }
 
-// ─── Spa Tab ─────────────────────────────────────────────────────────────────
+// ─── Spa Tab ──────────────────────────────────────────────────────────────────
 
 class _SpaTab extends ConsumerWidget {
   const _SpaTab();
@@ -529,36 +537,38 @@ class _SpaTab extends ConsumerWidget {
     final baseUrl = 'https://ext-api.$shipName.aida.de';
 
     return ref.watch(spaItemsProvider).when(
-          loading: () => const LoadingView(),
-          error: (e, _) => ErrorView(
-            error: e,
-            onRetry: () => ref.invalidate(spaItemsProvider),
-          ),
-          data: (resp) {
-            final categories = <String, List<SpaItem>>{};
-            for (final s in resp.data) {
-              final cat = s.category ?? 'Sonstige';
-              categories.putIfAbsent(cat, () => []).add(s);
-            }
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(spaItemsProvider),
+      ),
+      data: (resp) {
+        if (resp.data.isEmpty) {
+          return const _Empty(
+            icon: Icons.spa_rounded,
+            message: 'Kein Wellnessangebot gefunden',
+          );
+        }
 
-            if (resp.data.isEmpty) {
-              return _EmptyState(
-                icon: Icons.spa_rounded,
-                message: 'Kein Spa-Angebot gefunden',
-              );
-            }
+        final categories = <String, List<SpaItem>>{};
+        for (final s in resp.data) {
+          final cat = s.category ?? 'Sonstige';
+          categories.putIfAbsent(cat, () => []).add(s);
+        }
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-              children: [
-                for (final entry in categories.entries) ...[
-                  _SectionLabel(label: entry.key),
-                  ...entry.value.map((item) => _SpaCard(item: item, baseUrl: baseUrl)),
-                ],
-              ],
-            );
-          },
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
+          children: [
+            for (final entry in categories.entries) ...[
+              _SectionLabel(entry.key),
+              const SizedBox(height: 6),
+              ...entry.value.map((s) => _SpaCard(item: s, baseUrl: baseUrl)),
+              const SizedBox(height: 8),
+            ],
+          ],
         );
+      },
+    );
   }
 }
 
@@ -577,11 +587,11 @@ class _SpaCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => _showDetail(context),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -592,13 +602,13 @@ class _SpaCard extends StatelessWidget {
                 child: item.image != null
                     ? CachedNetworkImage(
                         imageUrl: '$baseUrl${item.image}',
-                        width: 64,
-                        height: 64,
+                        width: 60,
+                        height: 60,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) =>
-                            _PlaceholderIcon(icon: Icons.spa_rounded, cs: cs),
+                            _Placeholder(icon: Icons.spa_rounded, cs: cs),
                       )
-                    : _PlaceholderIcon(icon: Icons.spa_rounded, cs: cs),
+                    : _Placeholder(icon: Icons.spa_rounded, cs: cs),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -607,19 +617,20 @@ class _SpaCard extends StatelessWidget {
                   children: [
                     Text(
                       item.name ?? '',
-                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (item.locationName != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(Icons.place_rounded, size: 13, color: cs.primary),
-                          const SizedBox(width: 4),
+                          Icon(Icons.place_rounded, size: 12, color: cs.primary),
+                          const SizedBox(width: 3),
                           Text(
                             item.locationName!,
-                            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -628,8 +639,9 @@ class _SpaCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.bookmark_add_rounded, size: 13, color: cs.tertiary),
-                          const SizedBox(width: 4),
+                          Icon(Icons.bookmark_add_rounded,
+                              size: 12, color: cs.tertiary),
+                          const SizedBox(width: 3),
                           Text(
                             'Buchbar',
                             style: tt.labelSmall?.copyWith(
@@ -643,7 +655,7 @@ class _SpaCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: cs.outline),
+              Icon(Icons.chevron_right_rounded, color: cs.outline, size: 20),
             ],
           ),
         ),
@@ -663,11 +675,11 @@ class _SpaCard extends StatelessWidget {
         expand: false,
         builder: (_, ctrl) => ListView(
           controller: ctrl,
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+          padding: EdgeInsets.zero,
           children: [
             if (item.image != null)
               CachedNetworkImage(
-                imageUrl: 'https://ext-api.cosma.aida.de${item.image}',
+                imageUrl: '$baseUrl${item.image}',
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -701,6 +713,7 @@ class _SpaCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(item.additionalInformation!),
                   ],
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -711,30 +724,34 @@ class _SpaCard extends StatelessWidget {
   }
 }
 
-// ─── Shared widgets ───────────────────────────────────────────────────────────
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
   final String label;
-  const _SectionLabel({required this.label});
+  const _SectionLabel(this.label);
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: 14, bottom: 4),
       child: Row(
         children: [
+          Container(
+            width: 4,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppTheme.aidaGreen,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             label,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: cs.primary,
+                  color: cs.onSurface,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
                 ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Divider(color: cs.outlineVariant.withValues(alpha: 0.5)),
           ),
         ],
       ),
@@ -742,16 +759,12 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
+class _Badge extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
 
-  const _StatusBadge({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
+  const _Badge({required this.label, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -765,7 +778,7 @@ class _StatusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          Icon(icon, size: 11, color: color),
           const SizedBox(width: 4),
           Text(
             label,
@@ -780,50 +793,45 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _PlaceholderIcon extends StatelessWidget {
+class _Placeholder extends StatelessWidget {
   final IconData icon;
   final ColorScheme cs;
 
-  const _PlaceholderIcon({required this.icon, required this.cs});
+  const _Placeholder({required this.icon, required this.cs});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 64,
-      height: 64,
+      width: 60,
+      height: 60,
       color: cs.surfaceContainerHighest,
-      child: Icon(icon, color: cs.outline, size: 28),
+      child: Icon(icon, color: cs.outline, size: 24),
     );
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _Empty extends StatelessWidget {
   final IconData icon;
   final String message;
-
-  const _EmptyState({required this.icon, required this.message});
+  const _Empty({required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: cs.outline),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 52, color: cs.outline),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
